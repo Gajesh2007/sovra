@@ -1,0 +1,18 @@
+{
+  "scripts": {
+    "test": "anchor test"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.0",
+    "@solana/web3.js": "^1.95.0",
+    "@solana/spl-token": "^0.4.0"
+  },
+  "devDependencies": {
+    "chai": "^4.4.0",
+    "@types/chai": "^4.3.0",
+    "mocha": "^10.7.0",
+    "ts-mocha": "^10.0.0",
+    "@types/mocha": "^10.0.0",
+    "@types/bun": "^1.2.0"
+  }
+}

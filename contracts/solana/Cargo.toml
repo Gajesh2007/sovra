@@ -1,0 +1,11 @@
+[workspace]
+members = ["programs/auction"]
+resolver = "2"
+
+[workspace.dependencies]
+# Pin blake3 to avoid constant_time_eq 0.4.2 which requires edition2024
+# (incompatible with Solana platform tools' bundled Cargo)
+blake3 = "=1.5.5"
+
+[profile.release]
+overflow-checks = true

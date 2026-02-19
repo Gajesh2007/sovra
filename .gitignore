@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment & secrets
+.env
+*.local
+
+# Runtime data
+.data*/
+tmp/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Foundry (Base contracts)
+contracts/base/out/
+contracts/base/cache/
+contracts/base/broadcast/
+
+# Anchor / Solana contracts
+contracts/solana/target/
+contracts/solana/.anchor/test-ledger/
+contracts/solana/node_modules/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.playwright-cli/
+
+# Lock files (bun)
+bun.lock
+frontend/bun.lock
+contracts/solana/bun.lock
+
+# Misc
+VIDEO_SCRIPT.md
+package-lock.json
+
+# Alternate Twitter provider
+src/twitter/twitterapi-io.ts
+
+# Claude
+.claude/

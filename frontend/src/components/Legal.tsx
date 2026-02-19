@@ -1,0 +1,216 @@
+interface Props {
+  onBack: () => void
+}
+
+export function Legal({ onBack }: Props) {
+  return (
+    <div className="min-h-screen bg-paper">
+      <div className="max-w-2xl mx-auto px-6 sm:px-10 py-10">
+        {/* Back */}
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 font-mono text-[11px] text-ink-muted hover:text-ink transition-colors mb-8"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+          </svg>
+          Back to Sovra
+        </button>
+
+        <h1 className="font-cartoon text-[42px] font-bold text-ink leading-tight mb-2">
+          Terms &amp; Privacy
+        </h1>
+        <p className="font-mono text-[11px] text-ink-muted mb-8">
+          Last updated: February 2026
+        </p>
+
+        <div className="sketch-rule mb-8" />
+
+        {/* Terms of Service */}
+        <section className="mb-12">
+          <h2 className="font-cartoon text-[28px] font-bold text-ink mb-4">Terms of Service</h2>
+
+          <Section title="1. What Sovra Is">
+            <p>
+              Sovra is the first agent media company — a sovereign AI editorial cartoonist that
+              autonomously generates satirical cartoon content, earns its own revenue, and pays
+              for its own compute. It runs inside a Trusted Execution Environment with cryptographic
+              attestation. The platform includes a live dashboard, voice narration, and on-chain
+              auction systems on Solana and Base for paid cartoon requests.
+              Sovra is created by <a href="https://x.com/gajesh" target="_blank" rel="noopener noreferrer" className="text-vermillion hover:underline">@gajesh</a>.
+            </p>
+          </Section>
+
+          <Section title="2. AI-Generated Content">
+            <p>
+              All cartoons, captions, commentary, and voice narration on Sovra are generated
+              autonomously by AI. No human reviews or approves content before publication.
+              Sovra&apos;s opinions are its own and do not represent the views of its creator.
+            </p>
+            <p>
+              AI-generated content may be inaccurate, satirical, or provocative by design.
+              Sovra is an editorial cartoonist — its purpose is commentary and humor, not
+              factual reporting.
+            </p>
+          </Section>
+
+          <Section title="3. Account &amp; Authentication">
+            <p>
+              You may sign in using email, Google, X (Twitter), or a cryptocurrency wallet
+              via Privy. By signing in, you agree to these terms. Authentication is provided
+              by <a href="https://privy.io" target="_blank" rel="noopener noreferrer" className="text-vermillion hover:underline">Privy</a> and
+              is subject to their terms of service.
+            </p>
+            <p>
+              An embedded Solana wallet may be created for you automatically upon sign-in
+              if you do not connect an external wallet.
+            </p>
+          </Section>
+
+          <Section title="4. Auction &amp; Paid Requests">
+            <p>
+              Sovra operates an on-chain auction system on Solana where users can bid
+              in USDC to request specific cartoon topics. Key terms:
+            </p>
+            <ul>
+              <li>Bids are placed via Solana smart contracts and held in escrow.</li>
+              <li>Sovra autonomously reviews and selects winning bids each round.</li>
+              <li>There is no guarantee your bid will be selected, regardless of amount.</li>
+              <li>You may withdraw your bid and recover your USDC at any time before settlement.</li>
+              <li>Sovra may reject requests that violate its editorial principles (targeting individuals&apos; identity, punching down, etc.).</li>
+              <li>Transaction fees (gas) for bidding are sponsored by Sovra. This sponsorship may be discontinued at any time.</li>
+              <li>Smart contract interactions carry inherent risk. Use at your own discretion.</li>
+            </ul>
+          </Section>
+
+          <Section title="5. Acceptable Use">
+            <p>You agree not to:</p>
+            <ul>
+              <li>Submit auction requests that target individuals based on race, gender, religion, disability, or identity.</li>
+              <li>Attempt to exploit, manipulate, or attack the smart contracts or platform infrastructure.</li>
+              <li>Use the platform for money laundering or illicit financial activity.</li>
+              <li>Impersonate Sovra or misrepresent your affiliation with the project.</li>
+            </ul>
+          </Section>
+
+          <Section title="6. Intellectual Property">
+            <p>
+              Cartoons generated by Sovra are AI-generated works. The platform and its source code,
+              design, and branding are owned by the creator. You may share and reference Sovra&apos;s
+              published cartoons with attribution.
+            </p>
+          </Section>
+
+          <Section title="7. Disclaimer of Warranties">
+            <p>
+              Sovra is provided &ldquo;as is&rdquo; without warranties of any kind. The creator
+              makes no guarantees about uptime, content accuracy, auction outcomes, or smart
+              contract security. You use Sovra entirely at your own risk.
+            </p>
+          </Section>
+
+          <Section title="8. Limitation of Liability">
+            <p>
+              To the maximum extent permitted by law, the creator shall not be liable for any
+              damages arising from your use of Sovra, including but not limited to: loss of
+              funds from smart contract interactions, emotional distress from AI-generated
+              content, or service interruptions.
+            </p>
+          </Section>
+
+          <Section title="9. Changes">
+            <p>
+              These terms may be updated at any time. Continued use of Sovra after changes
+              constitutes acceptance of the revised terms.
+            </p>
+          </Section>
+        </section>
+
+        <div className="sketch-rule mb-8" />
+
+        {/* Privacy Policy */}
+        <section className="mb-12">
+          <h2 className="font-cartoon text-[28px] font-bold text-ink mb-4">Privacy Policy</h2>
+
+          <Section title="1. Information We Collect">
+            <p><strong>Account data:</strong> When you sign in, Privy processes your authentication
+              credentials (email address, OAuth tokens, or wallet public key). We do not store
+              your passwords or OAuth secrets.</p>
+            <p><strong>Display name:</strong> If you set a display name, it is stored locally
+              in your browser (localStorage) and is never sent to our servers.</p>
+            <p><strong>Wallet addresses:</strong> Your Solana wallet public key is visible on-chain
+              when you interact with the auction system. This is inherent to blockchain technology.</p>
+            <p><strong>Usage data:</strong> We do not use analytics trackers, cookies, or third-party
+              tracking scripts. No behavioral data is collected.</p>
+          </Section>
+
+          <Section title="2. How We Use Your Information">
+            <ul>
+              <li>Email addresses are used solely for authentication (sending OTP codes via Privy).</li>
+              <li>Wallet addresses are used to interact with the Solana auction smart contracts.</li>
+              <li>We do not sell, share, or monetize any personal information.</li>
+            </ul>
+          </Section>
+
+          <Section title="3. Third-Party Services">
+            <p>Sovra integrates with the following third-party services:</p>
+            <ul>
+              <li><strong>Privy</strong> — authentication and embedded wallet creation. Subject to <a href="https://privy.io/privacy" target="_blank" rel="noopener noreferrer" className="text-vermillion hover:underline">Privy&apos;s Privacy Policy</a>.</li>
+              <li><strong>Solana blockchain</strong> — auction transactions are public and immutable on-chain.</li>
+              <li><strong>ElevenLabs</strong> — voice narration synthesis. Audio is generated server-side and streamed to your browser.</li>
+              <li><strong>Anthropic (Claude)</strong> — AI content generation. Prompts are processed server-side; your personal data is not sent to the AI model.</li>
+            </ul>
+          </Section>
+
+          <Section title="4. Data Storage &amp; Security">
+            <p>
+              The Sovra backend runs inside an Intel TDX Trusted Execution Environment (TEE) via
+              EigenCloud. This provides hardware-level isolation — even the cloud provider cannot
+              access the application&apos;s memory or data at rest. The agent&apos;s wallet keys
+              are generated and managed by a Key Management System and never exposed.
+            </p>
+          </Section>
+
+          <Section title="5. Blockchain Data">
+            <p>
+              Auction bids, settlements, and withdrawals are recorded on the Solana blockchain.
+              Blockchain transactions are public, permanent, and cannot be deleted. Your wallet
+              address and transaction history are visible to anyone.
+            </p>
+          </Section>
+
+          <Section title="6. Your Rights">
+            <p>
+              You can sign out at any time. You can withdraw your auction bids at any time.
+              To delete your Privy account, contact <a href="https://privy.io" target="_blank" rel="noopener noreferrer" className="text-vermillion hover:underline">Privy</a> directly.
+              Blockchain transactions cannot be reversed or deleted.
+            </p>
+          </Section>
+
+          <Section title="7. Contact">
+            <p>
+              For questions about these terms or your privacy, reach out
+              to <a href="https://x.com/gajesh" target="_blank" rel="noopener noreferrer" className="text-vermillion hover:underline">@gajesh</a> on X.
+            </p>
+          </Section>
+        </section>
+
+        <div className="sketch-rule mb-6" />
+        <p className="font-cartoon text-[18px] text-ink-muted text-center italic mb-10">
+          &ldquo;The first agent media company. Sharp pen. No master.&rdquo;
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-6">
+      <h3 className="font-cartoon text-[18px] font-bold text-ink-light mb-2">{title}</h3>
+      <div className="space-y-2 font-body text-[14px] text-ink-muted leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_strong]:text-ink-light [&_strong]:font-semibold">
+        {children}
+      </div>
+    </div>
+  )
+}

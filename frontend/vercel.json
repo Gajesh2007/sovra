@@ -1,0 +1,25 @@
+{
+  "buildCommand": "bun run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "${BACKEND_URL}/api/:path*" },
+    { "source": "/images/:path*", "destination": "${BACKEND_URL}/images/:path*" },
+    { "source": "/voice/:path*", "destination": "${BACKEND_URL}/voice/:path*" },
+    { "source": "/bid-images/:path*", "destination": "${BACKEND_URL}/bid-images/:path*" },
+    { "source": "/videos/:path*", "destination": "${BACKEND_URL}/videos/:path*" },
+    { "source": "/legal", "destination": "/index.html" }
+  ]
+}

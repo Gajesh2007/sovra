@@ -1,0 +1,24 @@
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+cartoonist_auction = "2UDUA7vCqZ87c4kCXbshF7S5uuxMXJvykwn9LJ1JnMU2"
+
+[programs.mainnet]
+cartoonist_auction = "2UDUA7vCqZ87c4kCXbshF7S5uuxMXJvykwn9LJ1JnMU2"
+
+[programs.devnet]
+cartoonist_auction = "2UDUA7vCqZ87c4kCXbshF7S5uuxMXJvykwn9LJ1JnMU2"
+
+[registry]
+url = "https://api.apr.dev"
+
+[scripts]
+test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[provider]
+cluster = "mainnet"
+wallet = "~/.config/solana/id.json"

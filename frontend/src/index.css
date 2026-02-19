@@ -1,0 +1,378 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: 'Instrument Serif', 'Georgia', serif;
+  --font-cartoon: 'Caveat', cursive;
+  --font-hand: 'Patrick Hand', 'Caveat', cursive;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  /* Warm cartoon palette */
+  --color-paper: #f5efe0;
+  --color-paper-warm: #ebe4d3;
+  --color-paper-bright: #faf6eb;
+  --color-surface: #eee8d8;
+  --color-surface-raised: #faf6eb;
+
+  /* Ink hierarchy — bold cartoon contrast */
+  --color-ink: #1a1a1a;
+  --color-ink-secondary: #2d2d2d;
+  --color-ink-light: #4a4a4a;
+  --color-ink-muted: #7a7064;
+  --color-ink-faint: #b5ad9e;
+
+  /* Hand-drawn borders */
+  --color-border: #c9bfa8;
+  --color-border-strong: #a89c87;
+
+  /* Accents — rich editorial cartoon colors */
+  --color-vermillion: #c23616;
+  --color-cobalt: #1a5276;
+  --color-ochre: #b8860b;
+  --color-forest: #1a7a3a;
+  --color-violet: #5b3e96;
+  --color-cyan: #117a8b;
+
+  /* Legacy compat */
+  --color-text: #1a1a1a;
+  --color-text-secondary: #2d2d2d;
+  --color-text-muted: #7a7064;
+  --color-text-faint: #b5ad9e;
+  --color-void: #f5efe0;
+  --color-surface-bright: #eee8d8;
+}
+
+* { box-sizing: border-box; }
+
+html {
+  background: var(--color-paper);
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+/* Paper grain — more visible for cartoon feel */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* SVG filter for hand-drawn effect */
+.sketchy-svg-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Scrollbar — ink-style */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-ink-faint);
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-ink-muted); }
+
+/* Selection */
+::selection {
+  background: rgba(194, 54, 22, 0.15);
+  color: var(--color-ink);
+}
+
+/* ==========================================
+   CARTOON EFFECTS
+   ========================================== */
+
+/* Hand-drawn border utility — apply to panels, cards, buttons */
+.sketch-border {
+  border: 2.5px solid var(--color-ink);
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+}
+
+.sketch-border-light {
+  border: 2px solid var(--color-border-strong);
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+}
+
+.sketch-border-thin {
+  border: 1.5px solid var(--color-border);
+  border-radius: 225px 15px 255px 15px/15px 255px 15px 225px;
+}
+
+/* Ink splatter decoration */
+.ink-splatter::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--color-ink);
+  border-radius: 50% 40% 60% 30%;
+  opacity: 0.15;
+  right: -4px;
+  top: -4px;
+}
+
+/* Hand-drawn underline */
+.sketch-underline {
+  text-decoration: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='4'%3E%3Cpath d='M0 3 Q 25 0, 50 3 Q 75 6, 100 3' stroke='%23c23616' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: bottom;
+  background-size: 100px 4px;
+  padding-bottom: 4px;
+}
+
+/* Wobbly divider line */
+.sketch-rule {
+  border: none;
+  height: 3px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='4'%3E%3Cpath d='M0 2 Q 50 0, 100 2 Q 150 4, 200 2 Q 250 0, 300 2 Q 350 4, 400 2' stroke='%231a1a1a' fill='none' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 400px 4px;
+  opacity: 0.8;
+}
+
+.sketch-rule-thin {
+  border: none;
+  height: 2px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='3'%3E%3Cpath d='M0 1.5 Q 50 0, 100 1.5 Q 150 3, 200 1.5 Q 250 0, 300 1.5 Q 350 3, 400 1.5' stroke='%23c9bfa8' fill='none' stroke-width='1'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 400px 3px;
+}
+
+/* Cartoon panel — main content panels */
+.cartoon-panel {
+  background: var(--color-paper-bright);
+  border: 2.5px solid var(--color-ink);
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  box-shadow: 4px 4px 0 0 rgba(26, 26, 26, 0.08);
+}
+
+/* Cartoon button */
+.cartoon-btn {
+  border: 2px solid var(--color-ink);
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+  box-shadow: 3px 3px 0 0 var(--color-ink);
+  transition: all 0.1s ease;
+}
+.cartoon-btn:hover {
+  box-shadow: 1px 1px 0 0 var(--color-ink);
+  transform: translate(2px, 2px);
+}
+.cartoon-btn:active {
+  box-shadow: 0 0 0 0 var(--color-ink);
+  transform: translate(3px, 3px);
+}
+
+/* Cartoon badge/pill */
+.cartoon-pill {
+  border: 1.5px solid currentColor;
+  border-radius: 225px 15px 255px 15px/15px 255px 15px 225px;
+}
+
+/* Ink drip on left edge of sections */
+.ink-drip-left::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10%;
+  width: 4px;
+  height: 30px;
+  background: var(--color-vermillion);
+  border-radius: 0 0 50% 50%;
+  opacity: 0.6;
+}
+
+/* ==========================================
+   ANIMATIONS
+   ========================================== */
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes typewriter-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+@keyframes scan-line {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes draw-in {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes voice-bar-1 {
+  0%, 100% { height: 4px; }
+  50% { height: 12px; }
+}
+@keyframes voice-bar-2 {
+  0%, 100% { height: 8px; }
+  50% { height: 4px; }
+}
+@keyframes voice-bar-3 {
+  0%, 100% { height: 6px; }
+  50% { height: 12px; }
+}
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(-0.3deg); }
+  50% { transform: rotate(0.3deg); }
+}
+
+/* Playful letter scatter on hover */
+.sovra-title {
+  display: inline-flex;
+  cursor: pointer;
+}
+.sovra-title .sovra-letter {
+  display: inline-block;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease;
+}
+.sovra-title:hover .sovra-letter:nth-child(1) {
+  transform: translate(-3px, -6px) rotate(-8deg);
+  color: var(--color-vermillion);
+}
+.sovra-title:hover .sovra-letter:nth-child(2) {
+  transform: translate(2px, 5px) rotate(5deg);
+  color: var(--color-ochre);
+}
+.sovra-title:hover .sovra-letter:nth-child(3) {
+  transform: translate(-1px, -4px) rotate(-4deg);
+  color: var(--color-cobalt);
+}
+.sovra-title:hover .sovra-letter:nth-child(4) {
+  transform: translate(3px, 3px) rotate(7deg);
+  color: var(--color-forest);
+}
+.sovra-title:hover .sovra-letter:nth-child(5) {
+  transform: translate(-2px, -5px) rotate(-6deg);
+  color: var(--color-violet);
+}
+
+/* Buttons */
+button, [role="button"] {
+  cursor: pointer;
+}
+
+/* Focus ring — sketch style */
+*:focus-visible {
+  outline: 2.5px solid var(--color-cobalt);
+  outline-offset: 3px;
+  border-radius: 255px 15px 225px 15px/15px 225px 15px 255px;
+}
+
+/* ==========================================
+   MONOLOGUE ENTRY STYLES
+   ========================================== */
+
+.entry-line {
+  position: relative;
+}
+
+.entry-line::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+}
+
+/* ==========================================
+   CUSTOM UTILITY CLASSES
+   ========================================== */
+
+.glass-panel {
+  background: rgba(250, 246, 235, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.editorial-rule {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-border) 15%,
+    var(--color-border) 85%,
+    transparent
+  );
+  height: 1px;
+}
+
+.stat-glow {
+  text-shadow: 0 0 20px currentColor;
+}
+
+/* Status pill shimmer */
+.shimmer-sweep {
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.status-pill {
+  transition: background-color 0.4s ease, box-shadow 0.4s ease;
+  box-shadow: 0 0 0 0 transparent;
+  border-radius: 225px 15px 255px 15px/15px 255px 15px 225px;
+  border: 1.5px solid var(--color-border-strong);
+}
+
+.status-pill:hover {
+  box-shadow: 0 0 12px -2px currentColor;
+}
+
+/* Responsive breakpoint for sidebar */
+@media (max-width: 900px) {
+  .layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .sidebar-panel {
+    display: none;
+  }
+}

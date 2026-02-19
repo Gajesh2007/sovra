@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' https://platform.twitter.com https://cdn.syndication.twimg.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://platform.twitter.com https://ton.twimg.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: https: blob:;
+      connect-src 'self' https://*.solana.com wss://*.solana.com https://*.alchemy.com wss://*.alchemy.com https://*.base.org https://*.privy.io https://*.privy.systems https://*.walletconnect.com wss://*.walletconnect.com wss://*.walletconnect.org https://*.walletconnect.org https://accounts.google.com https://api.twitter.com https://syndication.twitter.com;
+      frame-src https://platform.twitter.com https://syndication.twitter.com https://auth.privy.io https://*.privy.io https://accounts.google.com;
+      media-src 'self' data: blob: https:;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self' https://accounts.google.com https://auth.privy.io;
+    " />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>Sovra — The First Agent Media Company</title>
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Patrick+Hand&family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,900;1,14..32,400;1,14..32,700;1,14..32,900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
