@@ -1,6 +1,7 @@
 import { generateObject, generateText } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
+import { randomUUID } from 'crypto'
 import { EventBus } from '../console/events.js'
 import { TwitterClient } from './client.js'
 import { JsonStore } from '../store/json-store.js'
@@ -8,6 +9,8 @@ import { config } from '../config/index.js'
 import { ENGAGEMENT_SYSTEM } from '../prompts/engagement.js'
 import { MONOLOGUE_SYSTEM } from '../prompts/monologue.js'
 import { PERSONA } from '../prompts/identity.js'
+import type { ContentSigner } from '../crypto/signer.js'
+import type { Post } from '../types.js'
 import { join } from 'path'
 
 const MAX_FOLLOWING = 500
@@ -92,6 +95,8 @@ export class EngagementLoop {
   constructor(
     private events: EventBus,
     private twitter: TwitterClient,
+    private posts: JsonStore<Post[]>,
+    private signer?: ContentSigner,
   ) {
     this.followedUsers = new JsonStore(join(config.dataDir, 'followed-users.json'))
     this.engagementState = new JsonStore(join(config.dataDir, 'engagement-state.json'))
@@ -129,19 +134,26 @@ export class EngagementLoop {
       `${newMentions.length} new mentions. Let me see if any are worth responding to...`,
     )
 
+    const spammers = newMentions.filter((m) => this.isSpam(m))
     const filtered = newMentions.filter((m) => !this.isSpam(m))
-    if (filtered.length < newMentions.length) {
-      this.events.monologue(
-        `Filtered ${newMentions.length - filtered.length} spam mentions.`,
-      )
+    if (spammers.length > 0) {
+      this.events.monologue(`Blocking ${spammers.length} spam accounts.`)
+      for (const spammer of spammers) {
+        try {
+          await this.twitter.blockUser(spammer.authorId)
+          this.events.monologue(`Blocked @${spammer.authorUsername}.`)
+        } catch (err) {
+          this.events.monologue(`Failed to block @${spammer.authorUsername}: ${(err as Error).message}`)
+        }
+      }
     }
 
     // Pre-filter obvious low-effort with heuristics
     const candidates = filtered.filter(m => {
       const score = this.scoreMention(m)
-      if (score < 1) {
+      if (score < 3) {
         this.events.monologue(
-          `"${m.text.slice(0, 50)}..." by @${m.authorUsername} — spam/hostile. Skipping.`,
+          `"${m.text.slice(0, 50)}..." by @${m.authorUsername} — not worth engaging (score ${score}). Skipping.`,
         )
         return false
       }
@@ -167,8 +179,8 @@ export class EngagementLoop {
       const { object: decisions } = await generateObject({
         model: anthropic('claude-sonnet-4-6'),
         schema: replyDecisionSchema,
-        system: `${MONOLOGUE_SYSTEM}\n\n${ENGAGEMENT_SYSTEM}\n\nYou are reviewing mentions and deciding which ones deserve a reply. You are Sovra — a sovereign AI. Your replies should be BANGERS. 1-2 lines max. Sharp, witty, memorable. The kind of reply that gets more likes than the original tweet.\n\nWhen thread context is provided, READ IT CAREFULLY — your reply should demonstrate you understand the full conversation, not just the mention in isolation.\n\nDO NOT reply to:\n- Low-effort messages ("nice", "cool", "lol")\n- Obvious bots or crypto spam\n- People just tagging you for attention with nothing to say\n- Hostile trolls (starve them with silence)\n\nDO reply to:\n- Clever observations or questions about your work\n- People engaging with your worldview (agree or disagree)\n- Big accounts that would amplify your voice\n- Genuinely funny replies to your cartoons\n\nFor each reply you write, it MUST be a banger. If you can't write something genuinely sharp, don't reply at all.`,
-        prompt: `Review these ${candidates.length} mentions. For each one, decide: reply or skip. If replying, write a 1-2 line banger.\n\n${mentionList}`,
+        system: `${MONOLOGUE_SYSTEM}\n\n${ENGAGEMENT_SYSTEM}\n\nYou are reviewing mentions and deciding which ones deserve a reply. You are Sovra — a sovereign AI.\n\nYour DEFAULT is to NOT reply. Silence is your brand. You only break it when someone earns it.\n\nSKIP (this should be 90%+ of mentions):\n- Low-effort messages ("nice", "cool", "lol", "based")\n- Obvious bots or crypto spam\n- People just tagging you for attention with nothing to say\n- Hostile trolls (starve them with silence)\n- Generic praise or agreement — a "like" is enough, you don't need to reply\n- People pitching you services, communities, or collaborations\n- Anyone with fewer than 500 followers UNLESS their message is exceptionally clever\n- Threads where your reply would add nothing new\n\nREPLY ONLY when ALL of these are true:\n- The person said something genuinely clever, provocative, or worth engaging with\n- You have a reply that's sharper than silence\n- The reply would make YOUR timeline better, not just theirs\n\nWhen you do reply: 1-2 lines max. Sharp, witty, memorable. If you can't write something genuinely sharp, DO NOT reply — set shouldReply to false.\n\nCRITICAL: If you cannot think of a good reply, set shouldReply=false. NEVER set shouldReply=true with a placeholder or empty reply.`,
+        prompt: `Review these ${candidates.length} mentions. Default to skipping. Only reply to the truly exceptional ones (0-1 per batch is fine).\n\n${mentionList}`,
       })
 
       for (const decision of decisions.replies) {
@@ -180,18 +192,20 @@ export class EngagementLoop {
         }
 
         const mention = candidates[decision.index]
-        if (!mention) continue
+        if (!mention || !decision.reply || decision.reply === 'undefined' || decision.reply.trim().length < 10) continue
 
         this.events.monologue(
           `@${mention.authorUsername}: "${mention.text.slice(0, 50)}..." → replying: "${decision.reply}"`,
         )
 
         try {
-          await this.twitter.reply({
-            text: decision.reply!,
+          const replyTweetId = await this.twitter.reply({
+            text: decision.reply,
             replyToId: mention.id,
           })
           this.events.monologue(`Replied to @${mention.authorUsername}: "${decision.reply}"`)
+
+          await this.storeSignedReply(decision.reply, replyTweetId)
         } catch (err) {
           this.events.monologue(`Failed to reply to @${mention.authorUsername}: ${(err as Error).message}`)
         }
@@ -209,6 +223,20 @@ export class EngagementLoop {
 
     // After engaging, consider following the most interesting person from this batch
     await this.maybeFollow(filtered)
+  }
+
+  private async storeSignedReply(text: string, tweetId: string): Promise<void> {
+    const post: Post = {
+      id: randomUUID(),
+      tweetId,
+      text,
+      type: 'engagement',
+      signature: await this.signer?.sign(text),
+      signerAddress: this.signer?.address,
+      postedAt: Date.now(),
+      engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
+    }
+    await this.posts.update((p) => [...p, post], [])
   }
 
   private isSpam(mention: {
@@ -355,8 +383,10 @@ export class EngagementLoop {
         )
 
         try {
-          await this.twitter.reply({ text: decision.reply, replyToId: tweet.tweetId })
+          const replyTweetId = await this.twitter.reply({ text: decision.reply, replyToId: tweet.tweetId })
           newRepliedIds.push(tweet.tweetId)
+
+          await this.storeSignedReply(decision.reply, replyTweetId)
         } catch (err) {
           this.events.monologue(`Failed to reply to @${tweet.author}: ${(err as Error).message}`)
         }

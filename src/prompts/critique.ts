@@ -28,4 +28,5 @@ Be suspicious of concepts that:
 - Require inside knowledge that narrows the audience too much
 - Are making a point but forgot to be funny
 - Play it safe when the topic demanded sharpness
+- Reference specific cryptocurrencies, tokens, memecoins, or prices
 `.trim()

@@ -3,6 +3,7 @@ import { useWallets } from '@privy-io/react-auth/solana'
 import type { AgentState } from '../types'
 import type { User } from '@privy-io/react-auth'
 import { sanitizeDisplayName } from '../security'
+import { VerifyModal } from './VerifyModal'
 import { config } from '../config'
 
 const STATE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
@@ -32,6 +33,7 @@ interface HeaderProps {
 export function Header({ state, connected, authenticated, user, onLogin, onLogout, muted, onToggleMute }: HeaderProps) {
   const stateInfo = STATE_LABELS[state] ?? { label: state, color: 'text-ink-muted', bg: 'bg-ink/5' }
   const [showAbout, setShowAbout] = useState(false)
+  const [showVerify, setShowVerify] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [earnings, setEarnings] = useState<number | null>(null)
   const [agentAddress, setAgentAddress] = useState<string | null>(null)
@@ -279,6 +281,17 @@ export function Header({ state, connected, authenticated, user, onLogin, onLogou
                 <span className="sovra-letter">r</span>
                 <span className="sovra-letter">a</span>
               </h1>
+              <a
+                href="https://x.com/TrulyAutonomous"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 cartoon-btn font-mono text-[12px] text-ink bg-paper-warm px-3 py-1.5 hover:bg-ink hover:text-paper-bright transition-colors"
+                style={{ transform: 'rotate(0.5deg)' }}
+                title="Follow @TrulyAutonomous on X"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                <span className="hidden sm:inline">@TrulyAutonomous</span>
+              </a>
               <button
                 onClick={() => setShowAbout(true)}
                 className="inline-flex items-center gap-1.5 cartoon-btn font-cartoon text-[14px] sm:text-[18px] text-ink bg-paper-warm px-3 sm:px-4 py-1"
@@ -298,10 +311,20 @@ export function Header({ state, connected, authenticated, user, onLogin, onLogou
                   <span className="text-forest/60">earned</span>
                 </a>
               )}
+              <button
+                onClick={() => setShowVerify(true)}
+                className="hidden sm:inline-flex items-center gap-1.5 cartoon-btn font-mono text-[12px] text-cobalt bg-cobalt/8 px-3 py-1 hover:bg-cobalt/15 transition-colors"
+                style={{ transform: 'rotate(-0.5deg)' }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span>Verify</span>
+              </button>
             </div>
 
             <div className="hidden md:flex flex-col items-end gap-1">
-              <a href={`https://verify.eigencloud.xyz/app/${import.meta.env.VITE_EIGENCLOUD_APP_ADDRESS ?? ''}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
+              <a href="https://verify.eigencloud.xyz/app/0x530fb7f224774b4887f689e4a4ffe9ebb3317bd8" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 opacity-70 hover:opacity-100 transition-opacity">
                 <span className="font-mono text-[11px] font-medium text-ink-muted uppercase tracking-widest">Made Sovereign with</span>
                 <img src="/eigencloud_logo.png" alt="EigenCloud" className="h-7" />
               </a>
@@ -453,6 +476,8 @@ export function Header({ state, connected, authenticated, user, onLogin, onLogou
         </div>
       </div>
     )}
+
+    <VerifyModal open={showVerify} onClose={() => setShowVerify(false)} />
 
     {/* Name prompt after sign-in */}
     {showNamePrompt && (

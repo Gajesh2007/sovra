@@ -26,9 +26,12 @@ export type ConsoleEvent =
 
 export interface LocalPost {
   id: string
+  tweetId?: string
   text: string
   imagePath: string | null
   videoPath: string | null
   quotedTweetId?: string
+  signature?: string
+  signerAddress?: string
   createdAt: number
 }

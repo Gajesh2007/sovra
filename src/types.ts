@@ -101,6 +101,8 @@ export interface Post {
   videoUrl?: string
   quotedTweetId?: string
   type: 'flagship' | 'quickhit' | 'paid' | 'engagement'
+  signature?: string
+  signerAddress?: string
   postedAt: number
   engagement: {
     likes: number

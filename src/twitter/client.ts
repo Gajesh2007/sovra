@@ -1,13 +1,12 @@
 import { TwitterApi } from 'twitter-api-v2'
 import { readFile } from 'fs/promises'
-import { basename } from 'path'
+import { join } from 'path'
 import { randomUUID } from 'crypto'
 import { toCdnUrl } from '../cdn/r2.js'
 import { EventBus } from '../console/events.js'
 import type { TwitterReadProvider } from './provider.js'
 import { JsonStore } from '../store/json-store.js'
 import { config } from '../config/index.js'
-import { join } from 'path'
 
 export interface LocalPost {
   id: string
@@ -120,7 +119,14 @@ export class TwitterClient {
     }
 
     // Upload video (chunked upload handled by library)
-    const videoBuffer = await readFile(opts.videoPath)
+    let videoBuffer: Buffer
+    if (opts.videoPath.startsWith('https://') || opts.videoPath.startsWith('http://')) {
+      const resp = await fetch(opts.videoPath)
+      if (!resp.ok) throw new Error(`Failed to download video: ${resp.status} ${resp.statusText}`)
+      videoBuffer = Buffer.from(await resp.arrayBuffer())
+    } else {
+      videoBuffer = await readFile(opts.videoPath)
+    }
     const mediaId = await this.writer.v1.uploadMedia(videoBuffer, {
       mimeType: 'video/mp4',
       type: 'tweet_video',
@@ -195,6 +201,7 @@ export class TwitterClient {
     Array<{
       id: string
       text: string
+      authorId: string
       authorUsername: string
       authorFollowers: number
       metrics: { likes: number; retweets: number; replies: number }
@@ -209,6 +216,7 @@ export class TwitterClient {
       return res.tweets.map((t) => ({
         id: t.id,
         text: t.text,
+        authorId: t.author.id,
         authorUsername: t.author.userName,
         authorFollowers: t.author.followers,
         metrics: {
@@ -260,15 +268,30 @@ export class TwitterClient {
   }
 
   async findTweetAbout(query: string): Promise<string | undefined> {
-    // Extract the first ~5 meaningful words for a focused search
-    const keywords = query
+    // Extract meaningful words for a focused search
+    const words = query
       .replace(/[^\w\s]/g, '')
       .split(/\s+/)
       .filter(w => w.length > 3)
-      .slice(0, 5)
-      .join(' ')
 
-    return this.readProvider.findTopTweet(keywords, 500)
+    // Try with 5 keywords first, then broaden to 3 if no results
+    for (const count of [5, 3]) {
+      const keywords = words.slice(0, count).join(' ')
+      if (!keywords) continue
+      console.log(`[twitter] findTweetAbout: keywords="${keywords}" (${count} words)`)
+      try {
+        const result = await this.readProvider.findTopTweet(keywords, 25)
+        if (result) {
+          console.log(`[twitter] findTweetAbout: result=${result}`)
+          return result
+        }
+      } catch (err) {
+        console.log(`[twitter] findTweetAbout: search failed for "${keywords}": ${(err as Error).message}`)
+      }
+    }
+
+    console.log(`[twitter] findTweetAbout: no result`)
+    return undefined
   }
 
   async follow(userId: string): Promise<void> {

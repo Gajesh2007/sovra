@@ -17,6 +17,7 @@ import { toCdnUrl } from '../cdn/r2.js'
 import { config } from '../config/index.js'
 import type { WorldviewStore } from './worldview.js'
 import type { VideoProducer } from '../video/producer.js'
+import type { ContentSigner } from '../crypto/signer.js'
 import { join } from 'path'
 
 interface AgentStores {
@@ -78,6 +79,7 @@ export class AgentLoop {
     private stores: AgentStores,
     private worldview?: WorldviewStore,
     private videoProducer?: VideoProducer,
+    private signer?: ContentSigner,
   ) {
     this.timerStore = new JsonStore(join(config.dataDir, 'agent-timers.json'))
     this.rejectedTopics = new JsonStore(join(config.dataDir, 'rejected-topics.json'))
@@ -330,6 +332,8 @@ export class AgentLoop {
       videoUrl: videoPath ? toCdnUrl(videoPath, 'videos') : undefined,
       quotedTweetId: quoteTweetId,
       type: 'paid',
+      signature: await this.signer?.sign(labeledCaption),
+      signerAddress: this.signer?.address,
       postedAt: Date.now(),
       engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
     }
@@ -504,6 +508,8 @@ export class AgentLoop {
       videoUrl: videoPath ? toCdnUrl(videoPath, 'videos') : undefined,
       quotedTweetId: quoteTweetId,
       type: 'flagship',
+      signature: await this.signer?.sign(caption),
+      signerAddress: this.signer?.address,
       postedAt: Date.now(),
       engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
     }
@@ -603,6 +609,8 @@ export class AgentLoop {
       videoUrl: videoPath ? toCdnUrl(videoPath, 'videos') : undefined,
       quotedTweetId: quoteTweetId,
       type: 'quickhit',
+      signature: await this.signer?.sign(caption),
+      signerAddress: this.signer?.address,
       postedAt: Date.now(),
       engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
     }
@@ -734,14 +742,35 @@ export class AgentLoop {
       if (signal?.tweetId && !used.has(signal.tweetId)) return signal.tweetId
     }
 
-    // Priority 2: search for a fresh, relevant tweet about the topic
-    // DO NOT use Grok cluster post IDs — they're random tweets from news
-    // clusters that often have NO connection to the cartoon's actual topic.
+    // Priority 2: Grok cluster post IDs — tweets from the news cluster
+    // These are real tweets related to the story. Pick the first unused one.
+    for (const sigId of topic.signals) {
+      const signal = signals.find((s) => s.id === sigId)
+      if (signal?.grok?.postIds) {
+        for (const postId of signal.grok.postIds) {
+          if (!used.has(postId)) {
+            this.events.monologue(`Using Grok cluster tweet: ${postId}`)
+            return postId
+          }
+        }
+      }
+    }
+
+    // Priority 3: search for a fresh, relevant tweet about the topic
     try {
+      this.events.monologue(`Searching for quote tweet about: "${topic.summary.slice(0, 80)}..."`)
       const found = await this.twitter.findTweetAbout(topic.summary)
-      if (found && !used.has(found)) return found
-    } catch {
-      // Search failed — post without a quote tweet
+      if (found && !used.has(found)) {
+        this.events.monologue(`Found quote tweet: ${found}`)
+        return found
+      }
+      if (found && used.has(found)) {
+        this.events.monologue(`Found tweet ${found} but already used. Skipping.`)
+      } else {
+        this.events.monologue('Quote tweet search returned no results.')
+      }
+    } catch (err) {
+      this.events.monologue(`Quote tweet search failed: ${(err as Error).message}`)
     }
 
     this.events.monologue('No fresh tweet to quote. Posting standalone.')

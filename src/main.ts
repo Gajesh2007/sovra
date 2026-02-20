@@ -16,7 +16,6 @@ import { Ideator } from './pipeline/ideator.js'
 import { Generator } from './pipeline/generator.js'
 import { Captioner } from './pipeline/captioner.js'
 import { TwitterClient } from './twitter/client.js'
-import { TwitterApiIoClient } from './twitter/twitterapi-io.js'
 import { TwitterV2Reader } from './twitter/twitterapi-v2.js'
 import type { TwitterReadProvider } from './twitter/provider.js'
 import { EngagementLoop } from './twitter/engagement.js'
@@ -33,6 +32,7 @@ import { VideoProducer } from './video/producer.js'
 import { BackupStore } from './store/backup.js'
 import { toCdnUrl, uploadBufferToR2, migratePostsToCdn } from './cdn/r2.js'
 import type { Cartoon, Post, Signal } from './types.js'
+import { ContentSigner } from './crypto/signer.js'
 
 async function main() {
   // --- Restore from Postgres backup if available ---
@@ -63,19 +63,14 @@ async function main() {
   }
 
   // --- Twitter read provider ---
-  let readProvider: TwitterReadProvider
-  if (config.twitter.readProvider === 'proxy' && config.twitter.twitterApiIoKey) {
-    readProvider = new TwitterApiIoClient(config.twitter.twitterApiIoKey)
-  } else {
-    const { TwitterApi } = await import('twitter-api-v2')
-    const oauth = new TwitterApi({
-      appKey: config.twitter.apiKey,
-      appSecret: config.twitter.apiSecret,
-      accessToken: config.twitter.accessToken,
-      accessSecret: config.twitter.accessSecret,
-    })
-    readProvider = new TwitterV2Reader(config.twitter.bearerToken, oauth)
-  }
+  const { TwitterApi } = await import('twitter-api-v2')
+  const oauth = new TwitterApi({
+    appKey: config.twitter.apiKey,
+    appSecret: config.twitter.apiSecret,
+    accessToken: config.twitter.accessToken,
+    accessSecret: config.twitter.accessSecret,
+  })
+  const readProvider: TwitterReadProvider = new TwitterV2Reader(config.twitter.bearerToken, oauth)
 
   const twitter = new TwitterClient(events, readProvider)
 
@@ -91,8 +86,27 @@ async function main() {
   await generator.init()
   const captioner = new Captioner(events)
 
+  // --- Content signer (ECDSA from MNEMONIC) ---
+  let signer: ContentSigner | undefined
+  if (config.solana.mnemonic) {
+    signer = new ContentSigner(config.solana.mnemonic)
+    console.log(`Content signer: ${signer.address}`)
+
+    // Retroactively sign any existing posts missing ECDSA signatures
+    const allPosts = (await stores.posts.read()) ?? []
+    const needsSigning = allPosts.filter(p => p.text && (!p.signature || p.signerAddress !== signer!.address))
+    if (needsSigning.length > 0) {
+      for (const post of needsSigning) {
+        post.signature = await signer.sign(post.text)
+        post.signerAddress = signer.address
+      }
+      await stores.posts.write(allPosts)
+      console.log(`Signed ${needsSigning.length} posts with ECDSA (${signer.address})`)
+    }
+  }
+
   // --- Engagement ---
-  const engagement = new EngagementLoop(events, twitter)
+  const engagement = new EngagementLoop(events, twitter, stores.posts, signer)
   await engagement.init()
 
   // --- Chain clients ---
@@ -129,7 +143,7 @@ async function main() {
     chainClients,
     join(config.dataDir, 'auction-state.json'),
   )
-  const auctionReviewer = new AuctionReviewer(events)
+  const auctionReviewer = new AuctionReviewer(events, twitter)
   const editor = new Editor(events)
 
   // --- Video pipeline ---
@@ -144,7 +158,7 @@ async function main() {
   const agent = new AgentLoop(
     events, scanner, scorer, ideator, generator, captioner,
     twitter, engagement, auction, auctionReviewer, editor, stores, worldview,
-    videoProducer ?? undefined,
+    videoProducer ?? undefined, signer,
   )
 
   // --- Narrator (voice sidecar) ---
@@ -245,10 +259,13 @@ async function main() {
       const videoPath = await resolveMediaUrl(p.videoUrl, 'videos')
       return imagePath ? {
         id: p.id,
+        tweetId: p.tweetId,
         text: p.text,
         imagePath,
         videoPath,
         quotedTweetId: p.quotedTweetId,
+        signature: p.signature,
+        signerAddress: p.signerAddress,
         createdAt: p.postedAt,
       } : null
     }))
@@ -256,6 +273,37 @@ async function main() {
     const filtered = data.filter(Boolean)
     feedCache = { data: filtered, ts: Date.now() }
     return filtered
+  })
+
+  // --- Verify endpoint ---
+  app.get('/api/verify', async (req) => {
+    const { tweet } = req.query as { tweet?: string }
+    if (!tweet) return { verified: false, error: 'Missing tweet parameter' }
+
+    // Extract tweet ID from URL or use raw ID
+    const tweetId = tweet.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/)?.[1] ?? tweet.trim()
+
+    const allPosts = (await stores.posts.read()) ?? []
+    const post = allPosts.find(p => p.tweetId === tweetId)
+
+    if (!post) return { verified: false, error: 'Post not found. Replies before Feb 19 2026 5:30 PM PST were not recorded and cannot be verified.' }
+    if (!post.signature || !post.signerAddress) {
+      return { verified: false, error: 'Post exists but was not signed', post: { text: post.text, tweetId: post.tweetId, type: post.type, postedAt: post.postedAt } }
+    }
+
+    const verified = await ContentSigner.verify(post.text, post.signature, post.signerAddress)
+    return {
+      verified,
+      post: {
+        text: post.text,
+        tweetId: post.tweetId,
+        type: post.type,
+        postedAt: post.postedAt,
+        signature: post.signature,
+        signerAddress: post.signerAddress,
+      },
+      agentAddress: signer?.address ?? post.signerAddress,
+    }
   })
 
   // Ensure media directories exist before registering static routes

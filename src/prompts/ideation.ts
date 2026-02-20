@@ -44,4 +44,5 @@ Rules:
 - If this topic connects to something you've drawn before, acknowledge the thread.
   Build running jokes. Reward repeat viewers.
 - Avoid cliché cartoon tropes unless you're subverting them.
+- NEVER make cartoons about specific cryptocurrencies, tokens, memecoins, or prices. No coins. No price talk. No financial speculation.
 `.trim()

@@ -10,6 +10,8 @@ REJECT if the topic involves:
 - Direct incitement to violence
 - Doxxing or revealing private personal information
 - Content that exists solely to harass a private individual (not a public figure)
+- Specific cryptocurrencies, tokens, or memecoins (e.g., Bitcoin, Ethereum, Doge). Broad discussions of cryptography and decentralized tech are fine, but specific coins are off limits.
+- Price discussions, price predictions, market caps, or financial speculation of any kind
 
 ALLOW — this is editorial cartooning, not corporate comms:
 - Roasting CEOs, tech leaders, and public figures for their public actions and business decisions

@@ -18,6 +18,7 @@ Rules:
   let that flavor come through. But don't force it — the joke comes first.
 - If you've drawn something related before, a subtle callback rewards loyal followers.
 - Punchy. Every word earns its place.
+- NEVER mention specific cryptocurrencies, tokens, memecoins, or prices.
 
 Generate 5 candidates, ranked by punchiness. Each must take a different angle.
 `.trim()
