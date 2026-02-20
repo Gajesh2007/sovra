@@ -28,7 +28,7 @@ export const config = {
 
   // Adaptive posting: starts fast, slows exponentially per post
   posting: {
-    minCooldownMs: testMode ? 5 * 60_000 : 10 * 60_000,     // 5min vs 10min
+    minCooldownMs: testMode ? 5 * 60_000 : 45 * 60_000,     // 5min vs 45min
     maxCooldownMs: testMode ? 5 * 60_000 : 60 * 60_000,     // 5min vs 1h
     growthFactor: 1.5,
   },
