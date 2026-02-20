@@ -6,7 +6,11 @@ dist/
 
 # Environment & secrets
 .env
+.env.*
+!.env.example
+!.env.example.tls
 *.local
+stream/.env
 
 # Runtime data
 .data*/
@@ -46,8 +50,11 @@ bun.lock
 frontend/bun.lock
 contracts/solana/bun.lock
 
-# Misc
+# Private docs
+ARTICLE.md
 VIDEO_SCRIPT.md
+docs/IDEA.md
+docs/SPEC.md
 package-lock.json
 
 # Alternate Twitter provider
