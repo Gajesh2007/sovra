@@ -33,6 +33,7 @@ import { VideoProducer } from './video/producer.js'
 import { BackupStore } from './store/backup.js'
 import { toCdnUrl, uploadBufferToR2, migratePostsToCdn } from './cdn/r2.js'
 import type { Cartoon, Post, Signal } from './types.js'
+import { registerWithSAID, sendSAIDHeartbeat } from './said/client.js'
 
 async function main() {
   // --- Restore from Postgres backup if available ---
@@ -44,6 +45,13 @@ async function main() {
     if (restored > 0) {
       console.log(`Restored ${restored} files from encrypted Postgres backup`)
     }
+  }
+
+  // --- Register with SAID Protocol ---
+  if (config.solana.mnemonic) {
+    await registerWithSAID(config.solana.mnemonic)
+    // Send heartbeat every 6 hours to prove liveness
+    setInterval(() => sendSAIDHeartbeat(config.solana.mnemonic), 6 * 3600_000)
   }
 
   // --- Event bus ---
