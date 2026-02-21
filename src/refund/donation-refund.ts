@@ -25,7 +25,6 @@ import {
   parseAbi,
   parseAbiItem,
   erc20Abi,
-  decodeEventLog,
   formatUnits,
   type Address,
   zeroAddress,
@@ -198,78 +197,40 @@ export async function refundDonationProceeds(
     throw new Error('Agent has 0 ETH on Base — cannot pay gas for refund transactions')
   }
 
-  // ── 3. Find the Uniswap pair for the token ──
-  const routerAbi = parseAbi(['function factory() view returns (address)', 'function WETH() view returns (address)'])
-  const factoryAbi = parseAbi(['function getPair(address, address) view returns (address)'])
-
-  const [factoryAddr, weth] = await Promise.all([
-    publicClient.readContract({ address: UNISWAP_ROUTER, abi: routerAbi, functionName: 'factory' }),
-    publicClient.readContract({ address: UNISWAP_ROUTER, abi: routerAbi, functionName: 'WETH' }),
-  ])
-  const pair = await publicClient.readContract({
-    address: factoryAddr as Address, abi: factoryAbi, functionName: 'getPair', args: [DONATION_TOKEN, weth as Address],
-  }) as Address
-
-  events.monologue(`[Refund] Uniswap pair: ${pair}`)
-
-  // ── 4. Index all tax-deduction Transfer events ──
+  // ── 3. Index all tax-deduction Transfer events ──
   const taxLogs = await getLogsChunked(publicClient, DONATION_TOKEN, { to: DONATION_TOKEN }, searchFrom, currentBlock)
   const taxEvents = taxLogs.filter((l: any) => l.args.from !== zeroAddress)
 
   events.monologue(`[Refund] Found ${taxEvents.length} tax events — attributing to traders...`)
 
-  // ── 5. Attribute each tax event to the trader who paid it ──
+  // ── 4. Attribute each tax event to the EOA that initiated the trade ──
+  // We use tx.from (the wallet that signed the transaction) rather than
+  // the token Transfer `from` field, because traders often use bot contracts,
+  // aggregators (1inch, etc.), or multi-hop routes. The token Transfer would
+  // point to those intermediate contracts, but tx.from is always the EOA
+  // that actually paid for and initiated the trade.
   const traderTax = new Map<string, bigint>()
   let totalTaxTokens = 0n
-  let receiptErrors = 0
+  const txFromCache = new Map<string, string>() // txHash -> tx.from
 
   for (const log of taxEvents) {
     const from = (log.args.from as string).toLowerCase()
     const value = log.args.value as bigint
 
-    if (from === pair.toLowerCase()) {
-      // Buy tax — tax tokens originate from the pair. The actual buyer is
-      // identified by finding the other Transfer in the same tx where the
-      // pair sends tokens to a non-contract address.
-      const receipt = await publicClient.getTransactionReceipt({ hash: log.transactionHash })
-      let buyer: string | null = null
+    // Skip tax events from the contract itself or the router (not user trades)
+    if (from === DONATION_TOKEN.toLowerCase() || from === UNISWAP_ROUTER.toLowerCase()) continue
 
-      for (const rl of receipt.logs) {
-        if (rl.address.toLowerCase() !== DONATION_TOKEN.toLowerCase()) continue
-        if (!rl.topics || rl.topics.length < 3) continue
-        try {
-          const decoded = decodeEventLog({
-            abi: [TRANSFER_EVENT],
-            data: rl.data,
-            topics: rl.topics as [`0x${string}`, ...`0x${string}`[]],
-          })
-          const dFrom = (decoded.args.from as string).toLowerCase()
-          const dTo = (decoded.args.to as string).toLowerCase()
-          if (dFrom === pair.toLowerCase() && dTo !== DONATION_TOKEN.toLowerCase() && dTo !== UNISWAP_ROUTER.toLowerCase() && dTo !== zeroAddress.toLowerCase()) {
-            buyer = dTo
-            break
-          }
-        } catch {
-          // Non-Transfer log topic — safe to skip
-        }
-      }
-
-      if (buyer) {
-        traderTax.set(buyer, (traderTax.get(buyer) ?? 0n) + value)
-        totalTaxTokens += value
-      } else {
-        receiptErrors++
-        events.monologue(`[Refund] WARNING: Could not identify buyer in tx ${log.transactionHash}`)
-      }
-    } else if (from !== DONATION_TOKEN.toLowerCase() && from !== UNISWAP_ROUTER.toLowerCase() && from !== pair.toLowerCase()) {
-      // Sell tax — `from` is the seller directly
-      traderTax.set(from, (traderTax.get(from) ?? 0n) + value)
-      totalTaxTokens += value
+    // Look up the EOA that signed this transaction
+    const txHash = log.transactionHash as string
+    let eoa = txFromCache.get(txHash)
+    if (!eoa) {
+      const tx = await publicClient.getTransaction({ hash: txHash as `0x${string}` })
+      eoa = (tx.from as string).toLowerCase()
+      txFromCache.set(txHash, eoa)
     }
-  }
 
-  if (receiptErrors > 0) {
-    events.monologue(`[Refund] ${receiptErrors} buy-tax events could not be attributed — those shares will remain in wallet`)
+    traderTax.set(eoa, (traderTax.get(eoa) ?? 0n) + value)
+    totalTaxTokens += value
   }
 
   if (totalTaxTokens === 0n || traderTax.size === 0) {
@@ -279,7 +240,7 @@ export async function refundDonationProceeds(
 
   events.monologue(`[Refund] ${traderTax.size} unique traders identified`)
 
-  // ── 6. Calculate proportional USDC refunds ──
+  // ── 5. Calculate proportional USDC refunds ──
   // refundableUsdc is capped at the amount actually received from the token contract,
   // never exceeding the wallet's current balance. Integer division ensures the sum of
   // all individual amounts (totalToDisperse) is <= refundableUsdc.
@@ -310,7 +271,7 @@ export async function refundDonationProceeds(
     `[Refund] Plan: return ${formatUnits(totalToDisperse, 6)} USDC to ${recipients.length} wallets via Disperse.app`,
   )
 
-  // ── 7. Approve Disperse to spend the full USDC amount ──
+  // ── 6. Approve Disperse to spend the full USDC amount ──
   const currentAllowance = await publicClient.readContract({
     address: USDC, abi: erc20Abi, functionName: 'allowance', args: [agentAddress, DISPERSE],
   })
@@ -336,7 +297,7 @@ export async function refundDonationProceeds(
     events.monologue(`[Refund] USDC approved — TX: ${hash}`)
   }
 
-  // ── 8. Determine batch size via simulation ──
+  // ── 7. Determine batch size via simulation ──
   const BATCH_SIZES = [recipients.length, 200, 100, 50] as const
   let batchSize = recipients.length
 
@@ -371,7 +332,7 @@ export async function refundDonationProceeds(
     `[Refund] Batch size: ${batchSize} (${totalBatches} batch${totalBatches > 1 ? 'es' : ''})`,
   )
 
-  // ── 9. Load partial progress (if resuming after crash) ──
+  // ── 8. Load partial progress (if resuming after crash) ──
   const partialState = await stateStore.read()
   const startFromIndex = partialState?.completedRecipientIndex ?? 0
   const disperseTxHashes = partialState?.disperseTxHashes ?? []
@@ -380,7 +341,7 @@ export async function refundDonationProceeds(
     events.monologue(`[Refund] Resuming from recipient index ${startFromIndex} (${startFromIndex} already sent)`)
   }
 
-  // ── 10. Simulate each batch, then execute — save progress after each ──
+  // ── 9. Simulate each batch, then execute — save progress after each ──
   let lastBlockNumber = 0n
 
   for (let i = startFromIndex; i < recipients.length; i += batchSize) {
@@ -446,7 +407,7 @@ export async function refundDonationProceeds(
     })
   }
 
-  // ── 11. Mark fully complete ──
+  // ── 10. Mark fully complete ──
   await stateStore.write({
     completed: true,
     reason: 'Returning unsolicited USDC from unauthorized third-party token "Sovra Fund" (0x6b6F…5b). Sovra did not create or endorse this token.',
