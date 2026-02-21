@@ -33,6 +33,7 @@ import { BackupStore } from './store/backup.js'
 import { toCdnUrl, uploadBufferToR2, migratePostsToCdn } from './cdn/r2.js'
 import type { Cartoon, Post, Signal } from './types.js'
 import { ContentSigner } from './crypto/signer.js'
+import { refundDonationProceeds } from './refund/donation-refund.js'
 
 async function main() {
   // --- Restore from Postgres backup if available ---
@@ -135,6 +136,20 @@ async function main() {
     )
     chainClients.push(baseClient)
     console.log('Base auction client enabled')
+  }
+
+  // --- One-time donation refund ---
+  // A third party launched an unauthorized token that directs tax fees to
+  // this agent's wallet. We return those funds to the original traders.
+  // On failure, the process halts to prevent double-sends on restart.
+  if (config.base.rpcUrl && config.solana.mnemonic) {
+    try {
+      await refundDonationProceeds(events, config.base.rpcUrl, config.solana.mnemonic, config.dataDir)
+    } catch (err) {
+      console.error('[refund] CRITICAL — Donation refund failed, halting to prevent double-send:')
+      console.error(err)
+      process.exit(1)
+    }
   }
 
   // --- Auction ---
