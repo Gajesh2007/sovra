@@ -93,10 +93,11 @@ export const config = {
   // Scheduled posting: target specific hours of the day (24h format)
   schedule: {
     enabled: !testMode,
-    postingHours: (process.env.POSTING_HOURS ?? '8,12,16,20').split(',').map(Number),  // 8am, 12pm, 4pm, 8pm ET
+    postingHours: (process.env.POSTING_HOURS ?? '8,20').split(',').map(Number),  // 8am, 8pm ET
     timezone: process.env.POSTING_TIMEZONE ?? 'America/New_York',
     windowMinutes: 30,   // Fire within ±30 min of target hour
-    minCooldownMs: testMode ? 30_000 : 3 * 3600_000,  // Minimum 3h between posts (supports 4/day schedule)
+    minCooldownMs: testMode ? 30_000 : 10 * 3600_000,  // Minimum 10h between posts (supports 2/day schedule)
+    scanWindowMinutes: 65,  // Only scan within this many minutes of a posting window
   },
 
   // Adaptive posting: starts fast, slows exponentially per post
@@ -117,12 +118,16 @@ export const config = {
 
   // Caching
   cache: {
-    topicEvalTtlMs: testMode ? 60_000 : 15 * 60_000,
+    topicEvalTtlMs: testMode ? 60_000 : 30 * 60_000,
     engagementEvalTtlMs: testMode ? 60_000 : 30 * 60_000,
     imagePromptTtlMs: testMode ? 60_000 : 24 * 3600_000,
     llmResponseTtlMs: testMode ? 60_000 : 3600_000,
     maxEntries: 1000,
   },
+
+  // Engagement intervals (adaptive: faster near posting windows, slower off-hours)
+  engagementActiveMs: testMode ? 10_000 : 5 * 60_000,       // 5 min near posting windows
+  engagementOffHoursMs: testMode ? 60_000 : 30 * 60_000,    // 30 min during off-hours
 
   // Worldview reflection
   reflectionIntervalMs: testMode ? 5 * 60_000 : 7 * 24 * 3600_000,  // 5min vs 7 days

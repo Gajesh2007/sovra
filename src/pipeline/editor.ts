@@ -115,11 +115,16 @@ export class Editor {
   }> {
     this.events.monologue('Sending to editorial review (text + image)...')
 
-    const pastFeed = allPastPosts
+    // Cap context to last 14 days to prevent unbounded token growth
+    const contextWindowMs = 14 * 24 * 3600_000
+    const recentPosts = allPastPosts.filter(p => Date.now() - p.postedAt < contextWindowMs)
+    const recentCartoons = allPastCartoons.filter(c => Date.now() - c.createdAt < contextWindowMs)
+
+    const pastFeed = recentPosts
       .map((p, i) => `${i + 1}. "${p.text}"`)
       .join('\n')
 
-    const pastTopics = allPastCartoons
+    const pastTopics = recentCartoons
       .map((c, i) => `${i + 1}. Topic: ${c.concept.visual} | Caption: "${c.caption}"`)
       .join('\n')
 
@@ -134,10 +139,10 @@ export class Editor {
       '',
       '---',
       '',
-      `ALL PREVIOUS POSTS (${allPastPosts.length} total, most recent last):`,
+      `RECENT POSTS (last 14 days, ${recentPosts.length} total):`,
       pastFeed || '(no previous posts)',
       '',
-      `PREVIOUS CARTOON TOPICS (${allPastCartoons.length} total):`,
+      `RECENT CARTOON TOPICS (last 14 days, ${recentCartoons.length} total):`,
       pastTopics || '(no previous cartoons)',
       '',
       'Review this cartoon. Should it be published?',

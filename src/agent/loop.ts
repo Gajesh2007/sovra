@@ -149,14 +149,20 @@ export class AgentLoop {
   }
 
   private async tick(): Promise<void> {
-    const signals = await this.scanner.scan()
-    if (signals.length === 0) {
-      this.events.monologue('No new signals. The agent economy is quiet.')
-    }
-
     const now = Date.now()
 
-    // Engagement check (every 5 min)
+    // Determine schedule state early so we can gate scanning and adapt engagement
+    const scheduleState = config.schedule.enabled ? this.getScheduleState() : null
+    const nearPostingWindow = scheduleState
+      ? scheduleState.minutesUntilNext <= config.schedule.scanWindowMinutes || scheduleState.shouldPost
+      : true  // Always active when schedule is disabled
+
+    // Adaptive engagement: faster near posting windows, slower off-hours
+    this.engagementCooldownMs = nearPostingWindow
+      ? config.engagementActiveMs
+      : config.engagementOffHoursMs
+
+    // Engagement check (adaptive interval)
     if (now - this.lastEngagement >= this.engagementCooldownMs) {
       try {
         await this.engagement.check()
@@ -180,27 +186,33 @@ export class AgentLoop {
       this.lastReflection = now
     }
 
-    // Content decisions
-    if (signals.length === 0) return
+    // Off-hours: skip scanning entirely to save API costs
+    if (!nearPostingWindow) {
+      if (Math.random() < 0.02) { // ~1 in 50 ticks to avoid log spam
+        this.events.monologue(
+          `Sleeping. Next post in ~${scheduleState!.minutesUntilNext}min (${scheduleState!.nextHour}:00 ${config.schedule.timezone}).`
+        )
+      }
+      return
+    }
+
+    // --- Active window: scan for signals ---
+    const signals = await this.scanner.scan()
+    if (signals.length === 0) {
+      this.events.monologue('No new signals. The agent economy is quiet.')
+      return
+    }
 
     // --- Scheduled posting (8am/8pm by default) ---
-    if (config.schedule.enabled) {
+    if (config.schedule.enabled && scheduleState) {
       const timeSinceLastPost = now - Math.max(this.lastFlagship, this.lastQuickhit)
-      const scheduleState = this.getScheduleState()
 
       if (scheduleState.shouldPost && timeSinceLastPost >= config.schedule.minCooldownMs) {
         this.events.monologue(`Scheduled post time: ${scheduleState.currentHour}:00 ${config.schedule.timezone}. Creating flagship cartoon...`)
         await this.doFlagship(signals)
-      } else if (scheduleState.minutesUntilNext <= 60) {
+      } else {
         // Pre-shortlist topics as we approach the posting window
         await this.tickCooldown(signals, scheduleState.minutesUntilNext * 60_000)
-      } else {
-        // Quiet period — just log occasionally
-        if (Math.random() < 0.02) { // ~1 in 50 ticks to avoid spam
-          this.events.monologue(
-            `Next scheduled post in ~${scheduleState.minutesUntilNext}min (${scheduleState.nextHour}:00 ${config.schedule.timezone}). Scanning...`
-          )
-        }
       }
       return
     }
