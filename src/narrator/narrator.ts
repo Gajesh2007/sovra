@@ -3,6 +3,7 @@ import { join } from 'path'
 import { generateText } from 'ai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { uploadToR2 } from '../cdn/r2.js'
+import { cleanupLocalIfOnR2 } from '../cdn/cleanup.js'
 import { EventBus, type ConsoleEvent } from '../console/events.js'
 import { config } from '../config/index.js'
 
@@ -102,6 +103,7 @@ export class Narrator {
       await writeFile(filepath, Buffer.from(audioBuffer))
 
       const cdnUrl = await uploadToR2(filepath, 'voice')
+      if (cdnUrl) await cleanupLocalIfOnR2([filepath])
 
       this.events.emit({
         type: 'voice',

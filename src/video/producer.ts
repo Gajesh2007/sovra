@@ -8,6 +8,7 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import type { CartoonConcept } from '../types.js'
 import { uploadToR2 } from '../cdn/r2.js'
+import { cleanupLocalIfOnR2 } from '../cdn/cleanup.js'
 import { EventBus } from '../console/events.js'
 import { config } from '../config/index.js'
 
@@ -138,7 +139,11 @@ export class VideoProducer {
       await this.cleanup(rawPath, composedPath !== finalPath ? composedPath : null)
 
       const cdnUrl = await uploadToR2(finalPath, 'videos')
-      if (!cdnUrl) this.events.monologue('Warning: video R2 upload failed. Using local path.')
+      if (cdnUrl) {
+        await cleanupLocalIfOnR2([finalPath])
+      } else {
+        this.events.monologue('Warning: video R2 upload failed. Using local path.')
+      }
       const resultPath = cdnUrl ?? finalPath
       this.events.monologue(`Creation video ready: ${resultPath}`)
       return resultPath
