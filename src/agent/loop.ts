@@ -14,6 +14,7 @@ import { AuctionReviewer } from '../auction/review.js'
 import { Editor } from '../pipeline/editor.js'
 import { JsonStore } from '../store/json-store.js'
 import { toCdnUrl } from '../cdn/r2.js'
+import { cleanupLocalIfOnR2 } from '../cdn/cleanup.js'
 import { config } from '../config/index.js'
 import type { WorldviewStore } from './worldview.js'
 import type { VideoProducer } from '../video/producer.js'
@@ -338,8 +339,18 @@ export class AgentLoop {
       engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
     }
 
+    if (config.r2.enabled) {
+      cartoon.variants = variants.map((v) => toCdnUrl(v, 'images'))
+    }
     await this.stores.cartoons.update((c) => [...c, cartoon], [])
     await this.stores.posts.update((p) => [...p, post], [])
+    if (config.r2.enabled) {
+      const mediaToCleanup: Array<string | null | undefined> = [...variants]
+      if (typeof videoPath === 'string' && !videoPath.startsWith('http')) {
+        mediaToCleanup.push(videoPath)
+      }
+      await cleanupLocalIfOnR2(mediaToCleanup)
+    }
   }
 
   // --- Cooldown: shortlist topics so the post phase can skip scoring ---
@@ -514,8 +525,18 @@ export class AgentLoop {
       engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
     }
 
+    if (config.r2.enabled) {
+      cartoon.variants = variants.map((v) => toCdnUrl(v, 'images'))
+    }
     await this.stores.cartoons.update((c) => [...c, cartoon], [])
     await this.stores.posts.update((p) => [...p, post], [])
+    if (config.r2.enabled) {
+      const mediaToCleanup: Array<string | null | undefined> = [...variants]
+      if (typeof videoPath === 'string' && !videoPath.startsWith('http')) {
+        mediaToCleanup.push(videoPath)
+      }
+      await cleanupLocalIfOnR2(mediaToCleanup)
+    }
     this.lastFlagship = Date.now()
     this.postCount++
   }
@@ -615,8 +636,18 @@ export class AgentLoop {
       engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
     }
 
+    if (config.r2.enabled) {
+      cartoon.variants = variants.map((v) => toCdnUrl(v, 'images'))
+    }
     await this.stores.cartoons.update((c) => [...c, cartoon], [])
     await this.stores.posts.update((p) => [...p, post], [])
+    if (config.r2.enabled) {
+      const mediaToCleanup: Array<string | null | undefined> = [...variants]
+      if (typeof videoPath === 'string' && !videoPath.startsWith('http')) {
+        mediaToCleanup.push(videoPath)
+      }
+      await cleanupLocalIfOnR2(mediaToCleanup)
+    }
     this.lastQuickhit = Date.now()
     this.postCount++
   }
