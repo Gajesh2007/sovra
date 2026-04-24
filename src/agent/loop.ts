@@ -14,6 +14,11 @@ import { AuctionReviewer } from '../auction/review.js'
 import { Editor } from '../pipeline/editor.js'
 import { JsonStore } from '../store/json-store.js'
 import { toCdnUrl } from '../cdn/r2.js'
+// Post-publish local cleanup assumes R2 upload succeeded earlier in the
+// pipeline (Generator, narrator, video producer). If an upload silently failed,
+// `toCdnUrl` returns a URL that won't resolve; the 7d janitor age sweep is the
+// backstop for orphan local files, and `resolveMediaUrl` in main.ts falls back
+// to local→CDN.
 import { cleanupLocalIfOnR2 } from '../cdn/cleanup.js'
 import { config } from '../config/index.js'
 import type { WorldviewStore } from './worldview.js'

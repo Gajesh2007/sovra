@@ -44,6 +44,10 @@ export class Janitor {
     }
     if (size <= eventLogMaxBytes) return { rotated: false }
 
+    // Read-then-rename races with EventBus `appendFile` on the same path:
+    // events written between the read and the rename are lost. Accepted because
+    // rotations are hourly, the window is ~10s of ms, and lost events are debug
+    // telemetry, not business data. Do not add a lock here without reason.
     const raw = await readFile(eventLogPath, 'utf-8')
     const lines = raw.trimEnd().split('\n')
     const kept = lines.slice(-eventLogKeepLines)
