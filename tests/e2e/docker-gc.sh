@@ -39,8 +39,8 @@ echo "== Seeding /app/.data =="
 docker cp tests/e2e/seed.sh "$CONTAINER:/tmp/seed.sh"
 docker exec "$CONTAINER" bash /tmp/seed.sh /app/.data
 
-echo "== Waiting 90s for a janitor cycle (TEST_MODE → 30s interval, +60s initial delay) =="
-sleep 90
+echo "== Waiting 10s for a janitor cycle (TEST_MODE → 2s initial delay + 5s interval) =="
+sleep 10
 
 echo "== Inspecting /app/.data after janitor run =="
 docker exec "$CONTAINER" sh -c 'du -sb /app/.data/events.jsonl /app/.data/images /app/.data/videos /app/.data/voice /app/.data/bid-images 2>/dev/null || true'

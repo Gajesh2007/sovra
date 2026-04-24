@@ -357,8 +357,8 @@ async function main() {
       console.warn(`[janitor] sweep failed: ${(err as Error).message}`)
     })
     janitorTimer = setInterval(runSweep, config.gc.sweepIntervalMs)
-    // Run one cycle a minute after boot so we don't race with startup work
-    setTimeout(runSweep, 60_000)
+    // Delay first cycle so we don't race with startup work
+    setTimeout(runSweep, config.gc.initialDelayMs)
     console.log(`[janitor] started (interval=${config.gc.sweepIntervalMs}ms, r2Enabled=${config.r2.enabled})`)
   }
 

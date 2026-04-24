@@ -118,7 +118,8 @@ export const config = {
   // Garbage collection
   gc: {
     enabled: process.env.GC_ENABLED !== 'false',
-    sweepIntervalMs: testMode ? 30_000 : 60 * 60_000,
+    initialDelayMs: testMode ? 2_000 : 60_000,
+    sweepIntervalMs: testMode ? 5_000 : 60 * 60_000,
     mediaMaxAgeMs: 7 * 24 * 3600_000,
     mediaPressureAgeMs: 1 * 24 * 3600_000,
     diskPressureThreshold: 0.70,
