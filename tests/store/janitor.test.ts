@@ -246,4 +246,83 @@ describe('Janitor — disk pressure', () => {
     const { access } = await import('fs/promises')
     await access(oldFile) // should not throw
   })
+
+  it('nulls out videoUrl as well as imageUrl under pressure when R2 disabled', async () => {
+    const DAY = 24 * 3600 * 1000
+    const imgFile = await seedFile('images', 'vid-post.png', 2 * DAY)
+    const vidFile = await seedFile('videos', 'vid-post.mp4', 2 * DAY)
+    const postsPath = join(dir, 'posts.json')
+    const postsStore = new JsonStore<Post[]>(postsPath)
+    await postsStore.write([{
+      id: 'p2',
+      tweetId: 't2',
+      cartoonId: 'c2',
+      text: 'y',
+      imageUrl: '/images/vid-post.png',
+      videoUrl: '/videos/vid-post.mp4',
+      type: 'organic',
+      postedAt: Date.now(),
+      engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
+    } as Post])
+
+    const janitor = new Janitor({
+      dataDir: dir,
+      eventLogPath: join(dir, 'events.jsonl'),
+      eventLogMaxBytes: 1 << 30,
+      eventLogKeepLines: 10,
+      mediaMaxAgeMs: 7 * DAY,
+      mediaPressureAgeMs: 1 * DAY,
+      diskPressureThreshold: 0.5,
+      r2Enabled: false,
+      postsStore,
+      getDiskUsage: async () => 0.9,
+    })
+
+    await janitor.sweep()
+
+    const { access } = await import('fs/promises')
+    await expect(access(imgFile)).rejects.toThrow()
+    await expect(access(vidFile)).rejects.toThrow()
+
+    const posts = (await postsStore.read()) ?? []
+    expect(posts[0].imageUrl).toBeUndefined()
+    expect(posts[0].videoUrl).toBeUndefined()
+  })
+
+  it('does not null URLs from unrelated subdirs sharing a basename', async () => {
+    const DAY = 24 * 3600 * 1000
+    // Delete /images/shared.png (old) but keep /bid-images/shared.png (fresh)
+    await seedFile('images', 'shared.png', 2 * DAY)
+    await seedFile('bid-images', 'shared.png', 0) // fresh, won't be deleted
+    const postsPath = join(dir, 'posts.json')
+    const postsStore = new JsonStore<Post[]>(postsPath)
+    await postsStore.write([{
+      id: 'p3',
+      tweetId: 't3',
+      cartoonId: 'c3',
+      text: 'z',
+      imageUrl: '/bid-images/shared.png',   // different subdir
+      type: 'organic',
+      postedAt: Date.now(),
+      engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
+    } as Post])
+
+    const janitor = new Janitor({
+      dataDir: dir,
+      eventLogPath: join(dir, 'events.jsonl'),
+      eventLogMaxBytes: 1 << 30,
+      eventLogKeepLines: 10,
+      mediaMaxAgeMs: 7 * DAY,
+      mediaPressureAgeMs: 1 * DAY,
+      diskPressureThreshold: 0.5,
+      r2Enabled: false,
+      postsStore,
+      getDiskUsage: async () => 0.9,
+    })
+
+    await janitor.sweep()
+
+    const posts = (await postsStore.read()) ?? []
+    expect(posts[0].imageUrl).toBe('/bid-images/shared.png')
+  })
 })

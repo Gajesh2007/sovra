@@ -60,12 +60,10 @@ export class Janitor {
     return { rotated: true, bytesBefore: size, bytesAfter: after, linesKept: kept.length }
   }
 
-  // Filled in Task 5 + Task 6:
-  async sweepMediaByAge(maxAgeMs: number): Promise<SweepResult> {
+  private async *forEachExpiredMedia(
+    maxAgeMs: number,
+  ): AsyncGenerator<{ path: string; size: number }> {
     const now = this.opts.now?.() ?? Date.now()
-    let filesDeleted = 0
-    let bytesReclaimed = 0
-
     for (const sub of MEDIA_SUBDIRS) {
       const subDir = join(this.opts.dataDir, sub)
       let entries
@@ -79,20 +77,33 @@ export class Janitor {
         const full = join(subDir, entry.name)
         try {
           const s = await stat(full)
-          if (now - s.mtimeMs > maxAgeMs) {
-            await unlink(full)
-            filesDeleted++
-            bytesReclaimed += s.size
-          }
+          if (now - s.mtimeMs > maxAgeMs) yield { path: full, size: s.size }
         } catch (err) {
           const code = (err as NodeJS.ErrnoException).code
           if (code !== 'ENOENT') {
-            console.warn(`[janitor] stat/unlink ${full}: ${(err as Error).message}`)
+            console.warn(`[janitor] stat ${full}: ${(err as Error).message}`)
           }
         }
       }
     }
+  }
 
+  // Filled in Task 5 + Task 6:
+  async sweepMediaByAge(maxAgeMs: number): Promise<SweepResult> {
+    let filesDeleted = 0
+    let bytesReclaimed = 0
+    for await (const { path, size } of this.forEachExpiredMedia(maxAgeMs)) {
+      try {
+        await unlink(path)
+        filesDeleted++
+        bytesReclaimed += size
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT') {
+          console.warn(`[janitor] unlink ${path}: ${(err as Error).message}`)
+        }
+      }
+    }
     if (filesDeleted > 0) {
       console.log(`[janitor] age sweep (>${maxAgeMs}ms) deleted ${filesDeleted} files (${bytesReclaimed} bytes)`)
     }
@@ -135,35 +146,18 @@ export class Janitor {
   }
 
   private async aggressiveSweep(): Promise<string[]> {
-    const now = this.opts.now?.() ?? Date.now()
     const deleted: string[] = []
-
-    for (const sub of MEDIA_SUBDIRS) {
-      const subDir = join(this.opts.dataDir, sub)
-      let entries
+    for await (const { path } of this.forEachExpiredMedia(this.opts.mediaPressureAgeMs)) {
       try {
-        entries = await readdir(subDir, { withFileTypes: true })
-      } catch {
-        continue
-      }
-      for (const entry of entries) {
-        if (!entry.isFile()) continue
-        const full = join(subDir, entry.name)
-        try {
-          const s = await stat(full)
-          if (now - s.mtimeMs > this.opts.mediaPressureAgeMs) {
-            await unlink(full)
-            deleted.push(full)
-          }
-        } catch (err) {
-          const code = (err as NodeJS.ErrnoException).code
-          if (code !== 'ENOENT') {
-            console.warn(`[janitor] pressure unlink ${full}: ${(err as Error).message}`)
-          }
+        await unlink(path)
+        deleted.push(path)
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code
+        if (code !== 'ENOENT') {
+          console.warn(`[janitor] pressure unlink ${path}: ${(err as Error).message}`)
         }
       }
     }
-
     if (deleted.length > 0) {
       console.warn(`[janitor] pressure sweep deleted ${deleted.length} files`)
     }
@@ -172,19 +166,34 @@ export class Janitor {
 
   private async nullOutDeletedUrls(deletedPaths: string[]): Promise<void> {
     if (!this.opts.postsStore) return
-    const basenames = new Set(deletedPaths.map((p) => p.split('/').pop() ?? ''))
+    // Match on the last two path segments (<subdir>/<basename>) to avoid
+    // basename collisions across subdirs. URLs in posts.json are shaped like
+    // '/images/<filename>' or 'https://cdn/.../images/<filename>' — both end
+    // with the same <subdir>/<basename> suffix as the on-disk paths.
+    const suffixes = new Set(
+      deletedPaths.map((p) => {
+        const parts = p.split('/').filter(Boolean)
+        return parts.slice(-2).join('/')
+      }),
+    )
+    const endsWithAny = (url: string) => {
+      for (const suffix of suffixes) {
+        if (url.endsWith('/' + suffix) || url === suffix) return true
+      }
+      return false
+    }
 
     await this.opts.postsStore.update((posts) => {
       return posts.map((post) => {
         let changed = false
         const next = { ...post }
-        if (next.imageUrl) {
-          const base = next.imageUrl.split('/').pop() ?? ''
-          if (basenames.has(base)) { delete (next as { imageUrl?: string }).imageUrl; changed = true }
+        if (next.imageUrl && endsWithAny(next.imageUrl)) {
+          delete (next as { imageUrl?: string }).imageUrl
+          changed = true
         }
-        if (next.videoUrl) {
-          const base = next.videoUrl.split('/').pop() ?? ''
-          if (basenames.has(base)) { delete (next as { videoUrl?: string }).videoUrl; changed = true }
+        if (next.videoUrl && endsWithAny(next.videoUrl)) {
+          delete (next as { videoUrl?: string }).videoUrl
+          changed = true
         }
         return changed ? next : post
       })
