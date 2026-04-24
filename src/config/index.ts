@@ -115,6 +115,17 @@ export const config = {
     url: process.env.DATABASE_URL ?? '',
   },
 
+  // Garbage collection
+  gc: {
+    enabled: process.env.GC_ENABLED !== 'false',
+    sweepIntervalMs: testMode ? 30_000 : 60 * 60_000,
+    mediaMaxAgeMs: 7 * 24 * 3600_000,
+    mediaPressureAgeMs: 1 * 24 * 3600_000,
+    diskPressureThreshold: 0.70,
+    eventLogMaxBytes: 50 * 1024 * 1024,
+    eventLogKeepLines: 10_000,
+  },
+
   // Paths
   dataDir: '.data',
 } as const
