@@ -29,7 +29,7 @@ export interface SweepResult {
   bytesReclaimed: number
 }
 
-const MEDIA_SUBDIRS = ['images', 'videos', 'voice', 'bid-images'] as const
+export const MEDIA_SUBDIRS = ['images', 'videos', 'voice', 'bid-images'] as const
 
 export class Janitor {
   constructor(private opts: JanitorOptions) {}
@@ -61,8 +61,42 @@ export class Janitor {
   }
 
   // Filled in Task 5 + Task 6:
-  async sweepMediaByAge(_maxAgeMs: number): Promise<SweepResult> {
-    throw new Error('not implemented')
+  async sweepMediaByAge(maxAgeMs: number): Promise<SweepResult> {
+    const now = this.opts.now?.() ?? Date.now()
+    let filesDeleted = 0
+    let bytesReclaimed = 0
+
+    for (const sub of MEDIA_SUBDIRS) {
+      const subDir = join(this.opts.dataDir, sub)
+      let entries
+      try {
+        entries = await readdir(subDir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const entry of entries) {
+        if (!entry.isFile()) continue
+        const full = join(subDir, entry.name)
+        try {
+          const s = await stat(full)
+          if (now - s.mtimeMs > maxAgeMs) {
+            await unlink(full)
+            filesDeleted++
+            bytesReclaimed += s.size
+          }
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code
+          if (code !== 'ENOENT') {
+            console.warn(`[janitor] stat/unlink ${full}: ${(err as Error).message}`)
+          }
+        }
+      }
+    }
+
+    if (filesDeleted > 0) {
+      console.log(`[janitor] age sweep (>${maxAgeMs}ms) deleted ${filesDeleted} files (${bytesReclaimed} bytes)`)
+    }
+    return { filesDeleted, bytesReclaimed }
   }
   async sweep(): Promise<void> {
     throw new Error('not implemented')
