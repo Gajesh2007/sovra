@@ -99,6 +99,95 @@ export class Janitor {
     return { filesDeleted, bytesReclaimed }
   }
   async sweep(): Promise<void> {
-    throw new Error('not implemented')
+    await this.rotateEventLog().catch((err) => {
+      console.warn(`[janitor] rotateEventLog failed: ${(err as Error).message}`)
+    })
+
+    // (a) normal age sweep — only when R2 is authoritative
+    if (this.opts.r2Enabled) {
+      await this.sweepMediaByAge(this.opts.mediaMaxAgeMs).catch((err) => {
+        console.warn(`[janitor] age sweep failed: ${(err as Error).message}`)
+      })
+    }
+
+    // (b) disk pressure
+    const usage = await this.safeGetDiskUsage()
+    if (usage === null) return
+    if (usage <= this.opts.diskPressureThreshold) return
+
+    console.warn(`[janitor] disk pressure ${usage.toFixed(2)} > ${this.opts.diskPressureThreshold} — aggressive sweep`)
+    const deleted = await this.aggressiveSweep()
+    if (!this.opts.r2Enabled && this.opts.postsStore && deleted.length > 0) {
+      await this.nullOutDeletedUrls(deleted).catch((err) => {
+        console.warn(`[janitor] posts.json null-out failed: ${(err as Error).message}`)
+      })
+    }
+  }
+
+  private async safeGetDiskUsage(): Promise<number | null> {
+    if (!this.opts.getDiskUsage) return null
+    try {
+      return await this.opts.getDiskUsage(this.opts.dataDir)
+    } catch (err) {
+      console.warn(`[janitor] getDiskUsage failed: ${(err as Error).message}`)
+      return null
+    }
+  }
+
+  private async aggressiveSweep(): Promise<string[]> {
+    const now = this.opts.now?.() ?? Date.now()
+    const deleted: string[] = []
+
+    for (const sub of MEDIA_SUBDIRS) {
+      const subDir = join(this.opts.dataDir, sub)
+      let entries
+      try {
+        entries = await readdir(subDir, { withFileTypes: true })
+      } catch {
+        continue
+      }
+      for (const entry of entries) {
+        if (!entry.isFile()) continue
+        const full = join(subDir, entry.name)
+        try {
+          const s = await stat(full)
+          if (now - s.mtimeMs > this.opts.mediaPressureAgeMs) {
+            await unlink(full)
+            deleted.push(full)
+          }
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code
+          if (code !== 'ENOENT') {
+            console.warn(`[janitor] pressure unlink ${full}: ${(err as Error).message}`)
+          }
+        }
+      }
+    }
+
+    if (deleted.length > 0) {
+      console.warn(`[janitor] pressure sweep deleted ${deleted.length} files`)
+    }
+    return deleted
+  }
+
+  private async nullOutDeletedUrls(deletedPaths: string[]): Promise<void> {
+    if (!this.opts.postsStore) return
+    const basenames = new Set(deletedPaths.map((p) => p.split('/').pop() ?? ''))
+
+    await this.opts.postsStore.update((posts) => {
+      return posts.map((post) => {
+        let changed = false
+        const next = { ...post }
+        if (next.imageUrl) {
+          const base = next.imageUrl.split('/').pop() ?? ''
+          if (basenames.has(base)) { delete (next as { imageUrl?: string }).imageUrl; changed = true }
+        }
+        if (next.videoUrl) {
+          const base = next.videoUrl.split('/').pop() ?? ''
+          if (basenames.has(base)) { delete (next as { videoUrl?: string }).videoUrl; changed = true }
+        }
+        return changed ? next : post
+      })
+    }, [])
   }
 }

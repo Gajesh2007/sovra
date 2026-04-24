@@ -143,3 +143,107 @@ describe('Janitor — media age sweep', () => {
     expect(result.filesDeleted).toBe(0)
   })
 })
+
+import { JsonStore } from '../../src/store/json-store.js'
+import type { Post } from '../../src/types.js'
+
+describe('Janitor — disk pressure', () => {
+  let dir: string
+
+  beforeEach(async () => {
+    dir = join(tmpdir(), `sovra-janitor-pressure-${Date.now()}-${Math.random()}`)
+    for (const sub of ['images', 'videos', 'voice', 'bid-images']) {
+      await mkdir(join(dir, sub), { recursive: true })
+    }
+  })
+
+  afterEach(async () => {
+    await rm(dir, { recursive: true, force: true })
+  })
+
+  async function seedFile(sub: string, name: string, ageMs: number) {
+    const p = join(dir, sub, name)
+    await writeFile(p, Buffer.alloc(100))
+    const t = (Date.now() - ageMs) / 1000
+    await utimes(p, t, t)
+    return p
+  }
+
+  it('runs aggressive sweep when disk usage exceeds threshold', async () => {
+    const DAY = 24 * 3600 * 1000
+    const file = await seedFile('images', 'pressure.png', 2 * DAY)
+
+    const janitor = new Janitor({
+      dataDir: dir,
+      eventLogPath: join(dir, 'events.jsonl'),
+      eventLogMaxBytes: 1 << 30,
+      eventLogKeepLines: 10,
+      mediaMaxAgeMs: 7 * DAY,
+      mediaPressureAgeMs: 1 * DAY,
+      diskPressureThreshold: 0.5,
+      r2Enabled: true,
+      getDiskUsage: async () => 0.9,
+    })
+
+    await janitor.sweep()
+    const { access } = await import('fs/promises')
+    await expect(access(file)).rejects.toThrow()
+  })
+
+  it('nulls out posts.json URLs for files deleted under pressure when R2 disabled', async () => {
+    const DAY = 24 * 3600 * 1000
+    const file = await seedFile('images', 'referenced.png', 2 * DAY)
+    const postsPath = join(dir, 'posts.json')
+    const postsStore = new JsonStore<Post[]>(postsPath)
+    await postsStore.write([{
+      id: 'p1',
+      tweetId: 't1',
+      cartoonId: 'c1',
+      text: 'x',
+      imageUrl: '/images/referenced.png',
+      type: 'organic',
+      postedAt: Date.now(),
+      engagement: { likes: 0, retweets: 0, replies: 0, views: 0, lastChecked: 0 },
+    } as Post])
+
+    const janitor = new Janitor({
+      dataDir: dir,
+      eventLogPath: join(dir, 'events.jsonl'),
+      eventLogMaxBytes: 1 << 30,
+      eventLogKeepLines: 10,
+      mediaMaxAgeMs: 7 * DAY,
+      mediaPressureAgeMs: 1 * DAY,
+      diskPressureThreshold: 0.5,
+      r2Enabled: false,
+      postsStore,
+      getDiskUsage: async () => 0.9,
+    })
+
+    await janitor.sweep()
+
+    const { access } = await import('fs/promises')
+    await expect(access(file)).rejects.toThrow()
+
+    const posts = (await postsStore.read()) ?? []
+    expect(posts[0].imageUrl).toBeUndefined()
+  })
+
+  it('skips age sweep when R2 disabled and no pressure', async () => {
+    const DAY = 24 * 3600 * 1000
+    const oldFile = await seedFile('images', 'old.png', 30 * DAY)
+    const janitor = new Janitor({
+      dataDir: dir,
+      eventLogPath: join(dir, 'events.jsonl'),
+      eventLogMaxBytes: 1 << 30,
+      eventLogKeepLines: 10,
+      mediaMaxAgeMs: 7 * DAY,
+      mediaPressureAgeMs: 1 * DAY,
+      diskPressureThreshold: 0.9,
+      r2Enabled: false,
+      getDiskUsage: async () => 0.1,
+    })
+    await janitor.sweep()
+    const { access } = await import('fs/promises')
+    await access(oldFile) // should not throw
+  })
+})
