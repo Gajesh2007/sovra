@@ -180,22 +180,20 @@ export class Janitor {
         return parts.slice(-2).join('/')
       }),
     )
-    const endsWithAny = (url: string) => {
-      for (const suffix of suffixes) {
-        if (url.endsWith('/' + suffix) || url === suffix) return true
-      }
-      return false
+    const hasSuffix = (url: string) => {
+      const parts = url.split('/').filter(Boolean)
+      return suffixes.has(parts.slice(-2).join('/'))
     }
 
     await this.opts.postsStore.update((posts) => {
       return posts.map((post) => {
         let changed = false
         const next = { ...post }
-        if (next.imageUrl && endsWithAny(next.imageUrl)) {
+        if (next.imageUrl && hasSuffix(next.imageUrl)) {
           delete (next as { imageUrl?: string }).imageUrl
           changed = true
         }
-        if (next.videoUrl && endsWithAny(next.videoUrl)) {
+        if (next.videoUrl && hasSuffix(next.videoUrl)) {
           delete (next as { videoUrl?: string }).videoUrl
           changed = true
         }
