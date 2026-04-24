@@ -1,4 +1,4 @@
-import { readFile, writeFile, stat, rename, unlink, readdir } from 'fs/promises'
+import { readFile, writeFile, stat, rename, unlink, readdir, statfs } from 'fs/promises'
 import { join } from 'path'
 import type { JsonStore } from './json-store.js'
 import type { Post } from '../types.js'
@@ -199,4 +199,12 @@ export class Janitor {
       })
     }, [])
   }
+}
+
+export async function getDiskUsageStatfs(dataDir: string): Promise<number> {
+  const s = await statfs(dataDir)
+  if (s.blocks === 0) return 0
+  const free = s.bavail * s.bsize
+  const total = s.blocks * s.bsize
+  return (total - free) / total
 }
