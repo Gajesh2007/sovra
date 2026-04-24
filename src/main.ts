@@ -409,10 +409,13 @@ async function main() {
     const buf = await file.toBuffer()
     const ext = extname(file.filename) || '.png'
     const name = `${Date.now()}${ext}`
-    await writeFile(join(bidImagesDir, name), buf)
 
     const cdnUrl = await uploadBufferToR2(buf as Buffer, name, 'bid-images')
-    return { url: cdnUrl ?? `/bid-images/${name}` }
+    if (cdnUrl) return { url: cdnUrl }
+
+    // R2 disabled or upload failed — fall back to serving locally
+    await writeFile(join(bidImagesDir, name), buf)
+    return { url: `/bid-images/${name}` }
   })
 
   // Store bid request text + image off-chain (not on-chain)
