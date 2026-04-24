@@ -31,6 +31,8 @@ import { Narrator } from './narrator/narrator.js'
 import { VideoProducer } from './video/producer.js'
 import { BackupStore } from './store/backup.js'
 import { toCdnUrl, uploadBufferToR2, migratePostsToCdn } from './cdn/r2.js'
+import { Janitor, getDiskUsageStatfs } from './store/janitor.js'
+import { auditDataDir, formatAuditReport } from './store/disk-audit.js'
 import type { Cartoon, Post, Signal } from './types.js'
 import { ContentSigner } from './crypto/signer.js'
 import { refundDonationProceeds } from './refund/donation-refund.js'
@@ -328,6 +330,42 @@ async function main() {
   const videosDir = join(process.cwd(), config.dataDir, 'videos')
   await Promise.all([mkdir(imagesDir, { recursive: true }), mkdir(voiceDir, { recursive: true }), mkdir(bidImagesDir, { recursive: true }), mkdir(videosDir, { recursive: true })])
 
+  // --- Startup disk audit (one-shot, structured log for Datadog) ---
+  try {
+    const audit = await auditDataDir(config.dataDir)
+    console.log(formatAuditReport(audit))
+  } catch (err) {
+    console.warn(`[disk-audit] failed: ${(err as Error).message}`)
+  }
+
+  // --- Janitor ---
+  let janitorTimer: ReturnType<typeof setInterval> | null = null
+  if (config.gc.enabled) {
+    const janitor = new Janitor({
+      dataDir: config.dataDir,
+      eventLogPath: join(config.dataDir, 'events.jsonl'),
+      eventLogMaxBytes: config.gc.eventLogMaxBytes,
+      eventLogKeepLines: config.gc.eventLogKeepLines,
+      mediaMaxAgeMs: config.gc.mediaMaxAgeMs,
+      mediaPressureAgeMs: config.gc.mediaPressureAgeMs,
+      diskPressureThreshold: config.gc.diskPressureThreshold,
+      r2Enabled: config.r2.enabled,
+      postsStore: stores.posts,
+      getDiskUsage: getDiskUsageStatfs,
+    })
+    const runSweep = () => janitor.sweep().catch((err) => {
+      console.warn(`[janitor] sweep failed: ${(err as Error).message}`)
+    })
+    janitorTimer = setInterval(runSweep, config.gc.sweepIntervalMs)
+    // Delay first cycle so we don't race with startup work
+    setTimeout(runSweep, config.gc.initialDelayMs)
+    console.log(`[janitor] started (interval=${config.gc.sweepIntervalMs}ms, r2Enabled=${config.r2.enabled})`)
+  }
+
+  app.addHook('onClose', async () => {
+    if (janitorTimer) clearInterval(janitorTimer)
+  })
+
   // Serve generated images from .data/images/
   await app.register(import('@fastify/static'), {
     root: imagesDir,
@@ -371,10 +409,13 @@ async function main() {
     const buf = await file.toBuffer()
     const ext = extname(file.filename) || '.png'
     const name = `${Date.now()}${ext}`
-    await writeFile(join(bidImagesDir, name), buf)
 
     const cdnUrl = await uploadBufferToR2(buf as Buffer, name, 'bid-images')
-    return { url: cdnUrl ?? `/bid-images/${name}` }
+    if (cdnUrl) return { url: cdnUrl }
+
+    // R2 disabled or upload failed — fall back to serving locally
+    await writeFile(join(bidImagesDir, name), buf)
+    return { url: `/bid-images/${name}` }
   })
 
   // Store bid request text + image off-chain (not on-chain)
